@@ -2,8 +2,18 @@
 """
 Extract SuperPoint descriptors from dataset images for BoW vocabulary training.
 
-Uses ONNX Runtime to run SuperPoint inference, then applies confidence thresholding,
-NMS, score-ranked Top-K selection to produce high-quality descriptors.
+v3: accuracy-focused — adaptive threshold, spatial grid forcing, quality filter.
+
+Pipeline per image:
+  1. ONNX inference -> semi + desc
+  2. softmax + reshape -> heatmap
+  3. NMS -> candidate keypoints + scores
+  4. Adaptive confidence: percentile-based threshold (not fixed)
+  5. Spatial grid forcing: ensure even coverage across image regions
+  6. Score-ranked Top-K truncation
+  7. Bilinear interpolation -> sub-pixel descriptors
+  8. Quality filter: remove degenerate descriptors (low norm / high NaN)
+  9. L2 normalize
 
 Output binary format (compatible with train_sp_vocabulary C++ tool):
   - num_images  (int32)
@@ -26,41 +36,26 @@ import onnxruntime as ort
 
 
 # ──────────────────────────────────────────────
-# 流程二核心: NMS + 置信度过滤 + 分数排序 + Top-K 截断
+# Core: softmax + reshape + NMS
 # ──────────────────────────────────────────────
 
 def softmax_64ch(semi):
-    """
-    Dustbin-free softmax + reshape 64 channels -> 8x8 grid -> full-resolution heatmap.
-
-    Args:
-        semi: (65, H/8, W/8) raw logits from ONNX
-    Returns:
-        heatmap: (H, W) full-resolution score map
-    """
-    cells = semi[:64]  # (64, featH, featW)
-
-    # Softmax over 64 sub-pixel channels (exclude dustbin ch64)
+    """Dustbin-free softmax + reshape 64ch -> 8x8 grid -> full-resolution heatmap."""
+    cells = semi[:64]
     cells = cells - cells.max(axis=0, keepdims=True)
     exp_cells = np.exp(cells)
     prob = exp_cells / exp_cells.sum(axis=0, keepdims=True)
 
-    # Reshape: 64 channels -> 8x8 grid -> full resolution (H, W)
     featH, featW = prob.shape[1], prob.shape[2]
     heatmap = np.zeros((featH * 8, featW * 8), dtype=np.float32)
-
     for dy in range(8):
         for dx in range(8):
             heatmap[dy::8, dx::8] = prob[dy * 8 + dx]
-
     return heatmap
 
 
 def nms_dilate(scores, nms_radius):
-    """
-    Fast NMS via cv2.dilate (O(1) per pixel using max-pool).
-    Returns ALL local maxima above 0, unsorted.
-    """
+    """Fast NMS via cv2.dilate. Returns ALL local maxima above 0."""
     kernel_size = 2 * nms_radius + 1
     kernel = np.ones((kernel_size, kernel_size), dtype=np.float32)
     local_max = cv2.dilate(scores, kernel)
@@ -69,30 +64,69 @@ def nms_dilate(scores, nms_radius):
     return ys, xs, scores[ys, xs]
 
 
-def extract_descriptors(session, img_float, conf_thresh, nms_radius, max_kp):
-    """
-    SuperPoint inference pipeline with quality-gated Top-K selection.
+# ──────────────────────────────────────────────
+# v3 新增: 空间网格均匀采样
+# ──────────────────────────────────────────────
 
-    Pipeline:
-      1. ONNX inference -> semi (65, H/8, W/8) + desc (256, H/8, W/8)
-      2. softmax + reshape -> full-resolution heatmap
-      3. NMS -> candidate keypoints + scores
-      4. Confidence threshold -> filter weak points
-      5. Sort by score descending -> rank quality
-      6. Top-K truncation -> keep only the elite
-      7. Bilinear interpolation -> sub-pixel descriptors
-      8. L2 normalize
+def spatial_grid_select(ys, xs, scores, H, W, grid_n=4, max_per_cell=None):
+    """
+    Divide image into grid_n×grid_n cells, take top points from each cell.
+    This prevents keypoints from clustering in one textured region and ensures
+    the vocabulary sees features from all parts of the image.
 
     Args:
-        session:      ONNX Runtime session
-        img_float:    (H, W) float32 grayscale [0,1], padded to multiple of 8
-        conf_thresh:  minimum keypoint confidence
-        nms_radius:   NMS suppression radius in pixels
-        max_kp:       maximum keypoints to keep per image
+        ys, xs, scores:  candidate keypoints (pre-sorted by score descending)
+        H, W:           image dimensions
+        grid_n:         number of cells per axis (4×4 = 16 cells)
+        max_per_cell:   max points per cell (None = no limit)
 
     Returns:
-        descriptors: (N, 256) float32, L2-normalized, score-ranked
+        mask: boolean array, True for selected keypoints
     """
+    cell_h, cell_w = H / grid_n, W / grid_n
+
+    # Assign each keypoint to a grid cell
+    cy = np.clip((ys / cell_h).astype(int), 0, grid_n - 1)
+    cx = np.clip((xs / cell_w).astype(int), 0, grid_n - 1)
+    cell_id = cy * grid_n + cx  # unique cell index
+
+    # For each cell, keep top-scoring points
+    mask = np.zeros(len(ys), dtype=bool)
+    for c in range(grid_n * grid_n):
+        cell_mask = cell_id == c
+        indices = np.where(cell_mask)[0]
+        if len(indices) == 0:
+            continue
+        # Points are already sorted by score (caller ensures this)
+        if max_per_cell is not None and len(indices) > max_per_cell:
+            indices = indices[:max_per_cell]
+        mask[indices] = True
+
+    return mask
+
+
+# ──────────────────────────────────────────────
+# Core extraction pipeline
+# ──────────────────────────────────────────────
+
+def extract_descriptors(session, img_float, conf_percentile, nms_radius,
+                        max_kp, grid_n=4, max_per_cell=None):
+    """
+    SuperPoint inference with adaptive threshold + spatial grid + quality filter.
+
+    Args:
+        session:          ONNX Runtime session
+        img_float:        (H, W) float32 grayscale [0,1]
+        conf_percentile:  keep top N% by confidence (e.g. 0.3 = top 30%)
+        nms_radius:       NMS suppression radius
+        max_kp:           absolute max keypoints per image
+        grid_n:           spatial grid cells per axis (4 = 4x4 = 16 cells)
+        max_per_cell:     max keypoints per grid cell (None = no limit)
+
+    Returns:
+        descriptors: (N, 256) float32, L2-normalized
+    """
+    H, W = img_float.shape
     input_tensor = img_float[np.newaxis, np.newaxis, :, :].astype(np.float32)
     semi, desc = session.run(None, {'input': input_tensor})
 
@@ -100,30 +134,42 @@ def extract_descriptors(session, img_float, conf_thresh, nms_radius, max_kp):
     desc = desc[0]  # (256, featH, featW)
     featH, featW = desc.shape[1], desc.shape[2]
 
-    # Step 2: softmax + reshape -> heatmap
+    # Softmax + reshape -> heatmap
     heatmap = softmax_64ch(semi)
 
-    # Step 3: NMS -> all local maxima
+    # NMS -> all local maxima
     ys, xs, scores = nms_dilate(heatmap, nms_radius)
-
     if len(ys) == 0:
         return np.zeros((0, 256), dtype=np.float32)
 
-    # Step 4: confidence threshold (cheap, do BEFORE expensive interpolation)
-    mask = scores >= conf_thresh
+    # v3 改动 1: 自适应置信度 — 用百分位数代替固定阈值
+    # 保留置信度最高的前 conf_percentile 的关键点
+    thresh = np.percentile(scores, (1.0 - conf_percentile) * 100)
+    thresh = max(thresh, 1e-4)  # floor to avoid degenerate images
+    mask = scores >= thresh
     if not np.any(mask):
         return np.zeros((0, 256), dtype=np.float32)
     ys, xs, scores = ys[mask], xs[mask], scores[mask]
 
-    # Step 5: sort by score descending
+    # Sort by score descending
     order = np.argsort(-scores)
     ys, xs, scores = ys[order], xs[order], scores[order]
 
-    # Step 6: Top-K truncation
+    # v3 改动 2: 空间网格均匀采样
+    if grid_n > 0:
+        grid_mask = spatial_grid_select(ys, xs, scores, H, W,
+                                        grid_n=grid_n,
+                                        max_per_cell=max_per_cell)
+        ys, xs, scores = ys[grid_mask], xs[grid_mask], scores[grid_mask]
+
+    # Top-K truncation
     if len(ys) > max_kp:
         ys, xs, scores = ys[:max_kp], xs[:max_kp], scores[:max_kp]
 
-    # Step 7: bilinear interpolation for descriptors
+    if len(ys) == 0:
+        return np.zeros((0, 256), dtype=np.float32)
+
+    # Bilinear interpolation
     fx = (xs.astype(np.float32) - 4.0 + 0.5) / (featW * 8.0 - 4.0 - 0.5) * 2.0 - 1.0
     fy = (ys.astype(np.float32) - 4.0 + 0.5) / (featH * 8.0 - 4.0 - 0.5) * 2.0 - 1.0
     fx = (fx + 1.0) * (featW - 1.0) / 2.0
@@ -146,49 +192,60 @@ def extract_descriptors(session, img_float, conf_thresh, nms_radius, max_kp):
                    desc[:, y1, x0] * wc[np.newaxis, :] +
                    desc[:, y1, x1] * wd[np.newaxis, :]).T  # (N, 256)
 
-    # Step 8: L2 normalize
-    norms = np.linalg.norm(descriptors, axis=1, keepdims=True)
-    norms = np.maximum(norms, 1e-6)
+    # v3 改动 3: 描述子质量过滤
+    # 剔除插值后范数异常低的退化描述子
+    norms = np.linalg.norm(descriptors, axis=1)
+    valid = norms > 0.1  # L2-normalized 后范数应接近 1.0, <0.1 说明插值出问题
+    if not np.any(valid):
+        return np.zeros((0, 256), dtype=np.float32)
+    descriptors = descriptors[valid]
+
+    # L2 normalize
+    norms = norms[valid:valid+1] if valid.ndim == 0 else norms[valid]
+    norms = np.maximum(norms.reshape(-1, 1), 1e-6)
     descriptors = descriptors / norms
 
     return descriptors.astype(np.float32)
 
 
 # ──────────────────────────────────────────────
-# 流程一: argparse 参数接口
+# argparse
 # ──────────────────────────────────────────────
 
 def parse_args():
     p = argparse.ArgumentParser(
-        description='Extract SuperPoint descriptors for BoW vocabulary training')
+        description='Extract SuperPoint descriptors for BoW vocabulary training (v3: accuracy)')
 
     p.add_argument('image_dir', type=str,
                    help='Directory containing PNG/JPG images')
     p.add_argument('-o', '--output', type=str, default='sp_descriptors.bin',
-                   help='Output binary file path (default: sp_descriptors.bin)')
+                   help='Output binary file path')
     p.add_argument('--model', type=str,
                    default='/home/yuan/ORB_SLAM3/Models/superpoint_v1.onnx',
                    help='Path to SuperPoint ONNX model')
-    p.add_argument('--max_keypoints', type=int, default=200,
-                   help='Max keypoints per image (default: 200)')
+    p.add_argument('--max_keypoints', type=int, default=300,
+                   help='Max keypoints per image (default: 300)')
     p.add_argument('--skip_frames', type=int, default=5,
                    help='Process every N-th image (default: 5)')
-    p.add_argument('--conf_thresh', type=float, default=0.015,
-                   help='Minimum keypoint confidence (default: 0.015)')
+    p.add_argument('--conf_percentile', type=float, default=0.3,
+                   help='Keep top N%% keypoints by confidence (default: 0.3 = top 30%%)')
     p.add_argument('--nms_radius', type=int, default=4,
                    help='NMS suppression radius in pixels (default: 4)')
+    p.add_argument('--grid_n', type=int, default=4,
+                   help='Spatial grid cells per axis, 0=disable (default: 4 = 4x4)')
+    p.add_argument('--max_per_cell', type=int, default=50,
+                   help='Max keypoints per grid cell (default: 50)')
 
     return p.parse_args()
 
 
 # ──────────────────────────────────────────────
-# 流程三: 全局跳帧遍历 + 流程四: 二进制无损写入
+# Main: skip frames + extract + binary write
 # ──────────────────────────────────────────────
 
 def main():
     args = parse_args()
 
-    # Collect images
     image_paths = sorted(glob.glob(os.path.join(args.image_dir, '*.png')))
     if not image_paths:
         image_paths = sorted(glob.glob(os.path.join(args.image_dir, '*.jpg')))
@@ -196,24 +253,22 @@ def main():
         print(f"ERROR: No images found in {args.image_dir}", file=sys.stderr)
         sys.exit(1)
 
-    # Skip frames: only sample every N-th image for visual diversity
     sampled = image_paths[::args.skip_frames]
 
-    print(f"Dataset:  {args.image_dir}")
-    print(f"Total images:    {len(image_paths)}")
-    print(f"Skip frames:     {args.skip_frames}  ->  sampled: {len(sampled)}")
-    print(f"Max keypoints:   {args.max_keypoints}")
-    print(f"Conf threshold:  {args.conf_thresh}")
-    print(f"NMS radius:      {args.nms_radius}")
-    print(f"Model:           {args.model}")
+    print(f"Dataset:          {args.image_dir}")
+    print(f"Total images:     {len(image_paths)}")
+    print(f"Skip frames:      {args.skip_frames}  ->  sampled: {len(sampled)}")
+    print(f"Max keypoints:    {args.max_keypoints}")
+    print(f"Conf percentile:  {args.conf_percentile}  (top {args.conf_percentile*100:.0f}%%)")
+    print(f"NMS radius:       {args.nms_radius}")
+    print(f"Spatial grid:     {args.grid_n}x{args.grid_n}  ({args.grid_n**2} cells, max {args.max_per_cell}/cell)")
+    print(f"Model:            {args.model}")
     print()
 
-    # Load ONNX model
     print("Loading ONNX model...", flush=True)
     session = ort.InferenceSession(args.model, providers=['CPUExecutionProvider'])
     print("Model loaded.", flush=True)
 
-    # Extract descriptors
     all_num_kp = []
     all_descriptors = []
     total_kp = 0
@@ -228,9 +283,11 @@ def main():
         img_float = (img.astype(np.float32) / 255.0)[:((H // 8) * 8), :((W // 8) * 8)]
 
         desc = extract_descriptors(session, img_float,
-                                   conf_thresh=args.conf_thresh,
+                                   conf_percentile=args.conf_percentile,
                                    nms_radius=args.nms_radius,
-                                   max_kp=args.max_keypoints)
+                                   max_kp=args.max_keypoints,
+                                   grid_n=args.grid_n,
+                                   max_per_cell=args.max_per_cell)
 
         n_kp = len(desc)
         all_num_kp.append(n_kp)
@@ -242,8 +299,6 @@ def main():
               f"{n_kp:4d} kp  (global idx {i * args.skip_frames})",
               flush=True)
 
-    # Write binary file
-    # Format: num_images(i32) + counts(i32×N) + descriptors(float32×total×256)
     print(f"\nTotal: {total_kp} keypoints from {len(sampled)} images")
 
     with open(args.output, 'wb') as f:
