@@ -30,8 +30,10 @@
 #include "LoopClosing.h"
 #include "Frame.h"
 #include "ORBVocabulary.h"
+#include "SuperPointVocabulary.h"
 #include "KeyFrameDatabase.h"
 #include "ORBextractor.h"
+#include "SuperPointExtractor.h"
 #include "MapDrawer.h"
 #include "System.h"
 #include "ImuTypes.h"
@@ -260,6 +262,10 @@ protected:
     //ORB
     ORBextractor* mpORBextractorLeft, *mpORBextractorRight;
     ORBextractor* mpIniORBextractor;
+    SuperPointExtractor* mpSPextractorLeft = nullptr, *mpSPextractorRight = nullptr;
+    SuperPointExtractor* mpIniSPextractor = nullptr;
+    bool mbUseSuperPoint = false;
+    std::string mStrSettingPath;
 
     //BoW
     ORBVocabulary* mpORBVocabulary;

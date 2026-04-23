@@ -107,15 +107,28 @@ Frame::Frame(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timeSt
     mnId=nNextId++;
 
     // Scale Level Info
-    mnScaleLevels = mpORBextractorLeft->GetLevels();
-    mfScaleFactor = mpORBextractorLeft->GetScaleFactor();
-    mfLogScaleFactor = log(mfScaleFactor);
-    mvScaleFactors = mpORBextractorLeft->GetScaleFactors();
-    mvInvScaleFactors = mpORBextractorLeft->GetInverseScaleFactors();
-    mvLevelSigma2 = mpORBextractorLeft->GetScaleSigmaSquares();
-    mvInvLevelSigma2 = mpORBextractorLeft->GetInverseScaleSigmaSquares();
+    if(mbUseSuperPoint)
+    {
+        mnScaleLevels = mpSPextractorLeft->GetLevels();
+        mfScaleFactor = mpSPextractorLeft->GetScaleFactor();
+        mfLogScaleFactor = log(mfScaleFactor);
+        mvScaleFactors = mpSPextractorLeft->GetScaleFactors();
+        mvInvScaleFactors = mpSPextractorLeft->GetInverseScaleFactors();
+        mvLevelSigma2 = mpSPextractorLeft->GetScaleSigmaSquares();
+        mvInvLevelSigma2 = mpSPextractorLeft->GetInverseScaleSigmaSquares();
+    }
+    else
+    {
+        mnScaleLevels = mpORBextractorLeft->GetLevels();
+        mfScaleFactor = mpORBextractorLeft->GetScaleFactor();
+        mfLogScaleFactor = log(mfScaleFactor);
+        mvScaleFactors = mpORBextractorLeft->GetScaleFactors();
+        mvInvScaleFactors = mpORBextractorLeft->GetInverseScaleFactors();
+        mvLevelSigma2 = mpORBextractorLeft->GetScaleSigmaSquares();
+        mvInvLevelSigma2 = mpORBextractorLeft->GetInverseScaleSigmaSquares();
+    }
 
-    // ORB extraction
+    // Feature extraction
 #ifdef REGISTER_TIMES
     std::chrono::steady_clock::time_point time_StartExtORB = std::chrono::steady_clock::now();
 #endif
@@ -207,15 +220,28 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeSt
     mnId=nNextId++;
 
     // Scale Level Info
-    mnScaleLevels = mpORBextractorLeft->GetLevels();
-    mfScaleFactor = mpORBextractorLeft->GetScaleFactor();
-    mfLogScaleFactor = log(mfScaleFactor);
-    mvScaleFactors = mpORBextractorLeft->GetScaleFactors();
-    mvInvScaleFactors = mpORBextractorLeft->GetInverseScaleFactors();
-    mvLevelSigma2 = mpORBextractorLeft->GetScaleSigmaSquares();
-    mvInvLevelSigma2 = mpORBextractorLeft->GetInverseScaleSigmaSquares();
+    if(mbUseSuperPoint)
+    {
+        mnScaleLevels = mpSPextractorLeft->GetLevels();
+        mfScaleFactor = mpSPextractorLeft->GetScaleFactor();
+        mfLogScaleFactor = log(mfScaleFactor);
+        mvScaleFactors = mpSPextractorLeft->GetScaleFactors();
+        mvInvScaleFactors = mpSPextractorLeft->GetInverseScaleFactors();
+        mvLevelSigma2 = mpSPextractorLeft->GetScaleSigmaSquares();
+        mvInvLevelSigma2 = mpSPextractorLeft->GetInverseScaleSigmaSquares();
+    }
+    else
+    {
+        mnScaleLevels = mpORBextractorLeft->GetLevels();
+        mfScaleFactor = mpORBextractorLeft->GetScaleFactor();
+        mfLogScaleFactor = log(mfScaleFactor);
+        mvScaleFactors = mpORBextractorLeft->GetScaleFactors();
+        mvInvScaleFactors = mpORBextractorLeft->GetInverseScaleFactors();
+        mvLevelSigma2 = mpORBextractorLeft->GetScaleSigmaSquares();
+        mvInvLevelSigma2 = mpORBextractorLeft->GetInverseScaleSigmaSquares();
+    }
 
-    // ORB extraction
+    // Feature extraction
 #ifdef REGISTER_TIMES
     std::chrono::steady_clock::time_point time_StartExtORB = std::chrono::steady_clock::now();
 #endif
@@ -296,15 +322,28 @@ Frame::Frame(const cv::Mat &imGray, const double &timeStamp, ORBextractor* extra
     mnId=nNextId++;
 
     // Scale Level Info
-    mnScaleLevels = mpORBextractorLeft->GetLevels();
-    mfScaleFactor = mpORBextractorLeft->GetScaleFactor();
-    mfLogScaleFactor = log(mfScaleFactor);
-    mvScaleFactors = mpORBextractorLeft->GetScaleFactors();
-    mvInvScaleFactors = mpORBextractorLeft->GetInverseScaleFactors();
-    mvLevelSigma2 = mpORBextractorLeft->GetScaleSigmaSquares();
-    mvInvLevelSigma2 = mpORBextractorLeft->GetInverseScaleSigmaSquares();
+    if(mbUseSuperPoint)
+    {
+        mnScaleLevels = mpSPextractorLeft->GetLevels();
+        mfScaleFactor = mpSPextractorLeft->GetScaleFactor();
+        mfLogScaleFactor = log(mfScaleFactor);
+        mvScaleFactors = mpSPextractorLeft->GetScaleFactors();
+        mvInvScaleFactors = mpSPextractorLeft->GetInverseScaleFactors();
+        mvLevelSigma2 = mpSPextractorLeft->GetScaleSigmaSquares();
+        mvInvLevelSigma2 = mpSPextractorLeft->GetInverseScaleSigmaSquares();
+    }
+    else
+    {
+        mnScaleLevels = mpORBextractorLeft->GetLevels();
+        mfScaleFactor = mpORBextractorLeft->GetScaleFactor();
+        mfLogScaleFactor = log(mfScaleFactor);
+        mvScaleFactors = mpORBextractorLeft->GetScaleFactors();
+        mvInvScaleFactors = mpORBextractorLeft->GetInverseScaleFactors();
+        mvLevelSigma2 = mpORBextractorLeft->GetScaleSigmaSquares();
+        mvInvLevelSigma2 = mpORBextractorLeft->GetInverseScaleSigmaSquares();
+    }
 
-    // ORB extraction
+    // Feature extraction
 #ifdef REGISTER_TIMES
     std::chrono::steady_clock::time_point time_StartExtORB = std::chrono::steady_clock::now();
 #endif
@@ -330,6 +369,102 @@ Frame::Frame(const cv::Mat &imGray, const double &timeStamp, ORBextractor* extra
     mvpMapPoints = vector<MapPoint*>(N,static_cast<MapPoint*>(NULL));
 
     mmProjectPoints.clear();// = map<long unsigned int, cv::Point2f>(N, static_cast<cv::Point2f>(NULL));
+    mmMatchedInImage.clear();
+
+    mvbOutlier = vector<bool>(N,false);
+
+    // This is done only for the first Frame (or after a change in the calibration)
+    if(mbInitialComputations)
+    {
+        ComputeImageBounds(imGray);
+
+        mfGridElementWidthInv=static_cast<float>(FRAME_GRID_COLS)/static_cast<float>(mnMaxX-mnMinX);
+        mfGridElementHeightInv=static_cast<float>(FRAME_GRID_ROWS)/static_cast<float>(mnMaxY-mnMinY);
+
+        fx = static_cast<Pinhole*>(mpCamera)->toK().at<float>(0,0);
+        fy = static_cast<Pinhole*>(mpCamera)->toK().at<float>(1,1);
+        cx = static_cast<Pinhole*>(mpCamera)->toK().at<float>(0,2);
+        cy = static_cast<Pinhole*>(mpCamera)->toK().at<float>(1,2);
+        invfx = 1.0f/fx;
+        invfy = 1.0f/fy;
+
+        mbInitialComputations=false;
+    }
+
+
+    mb = mbf/fx;
+
+    //Set no stereo fisheye information
+    Nleft = -1;
+    Nright = -1;
+    mvLeftToRightMatch = vector<int>(0);
+    mvRightToLeftMatch = vector<int>(0);
+    mvStereo3Dpoints = vector<Eigen::Vector3f>(0);
+    monoLeft = -1;
+    monoRight = -1;
+
+    AssignFeaturesToGrid();
+
+    if(pPrevF)
+    {
+        if(pPrevF->HasVelocity())
+        {
+            SetVelocity(pPrevF->GetVelocity());
+        }
+    }
+    else
+    {
+        mVw.setZero();
+    }
+
+    mpMutexImu = new std::mutex();
+}
+
+Frame::Frame(const cv::Mat &imGray, const double &timeStamp, SuperPointExtractor* extractor, SuperPointVocabulary* voc, GeometricCamera* pCamera, cv::Mat &distCoef, const float &bf, const float &thDepth, Frame* pPrevF, const IMU::Calib &ImuCalib)
+    :mpcpi(NULL),mpSPVocabulary(voc),mpSPextractorLeft(extractor),mpSPextractorRight(static_cast<SuperPointExtractor*>(NULL)),
+     mbUseSuperPoint(true),mpORBvocabulary(nullptr),mpORBextractorLeft(static_cast<ORBextractor*>(NULL)),mpORBextractorRight(static_cast<ORBextractor*>(NULL)),
+     mTimeStamp(timeStamp), mK(static_cast<Pinhole*>(pCamera)->toK()), mK_(static_cast<Pinhole*>(pCamera)->toK_()), mDistCoef(distCoef.clone()), mbf(bf), mThDepth(thDepth),
+     mImuCalib(ImuCalib), mpImuPreintegrated(NULL),mpPrevFrame(pPrevF),mpImuPreintegratedFrame(NULL), mpReferenceKF(static_cast<KeyFrame*>(NULL)), mbIsSet(false), mbImuPreintegrated(false), mpCamera(pCamera),
+     mpCamera2(nullptr), mbHasPose(false), mbHasVelocity(false)
+{
+    // Frame ID
+    mnId=nNextId++;
+
+    // Scale Level Info
+    mnScaleLevels = mpSPextractorLeft->GetLevels();
+    mfScaleFactor = mpSPextractorLeft->GetScaleFactor();
+    mfLogScaleFactor = log(mfScaleFactor);
+    mvScaleFactors = mpSPextractorLeft->GetScaleFactors();
+    mvInvScaleFactors = mpSPextractorLeft->GetInverseScaleFactors();
+    mvLevelSigma2 = mpSPextractorLeft->GetScaleSigmaSquares();
+    mvInvLevelSigma2 = mpSPextractorLeft->GetInverseScaleSigmaSquares();
+
+    // Feature extraction
+#ifdef REGISTER_TIMES
+    std::chrono::steady_clock::time_point time_StartExtORB = std::chrono::steady_clock::now();
+#endif
+    ExtractORB(0,imGray,0,1000);
+#ifdef REGISTER_TIMES
+    std::chrono::steady_clock::time_point time_EndExtORB = std::chrono::steady_clock::now();
+
+    mTimeORB_Ext = std::chrono::duration_cast<std::chrono::duration<double,std::milli> >(time_EndExtORB - time_StartExtORB).count();
+#endif
+
+
+    N = mvKeys.size();
+    if(mvKeys.empty())
+        return;
+
+    UndistortKeyPoints();
+
+    // Set no stereo information
+    mvuRight = vector<float>(N,-1);
+    mvDepth = vector<float>(N,-1);
+    mnCloseMPs = 0;
+
+    mvpMapPoints = vector<MapPoint*>(N,static_cast<MapPoint*>(NULL));
+
+    mmProjectPoints.clear();
     mmMatchedInImage.clear();
 
     mvbOutlier = vector<bool>(N,false);
@@ -415,13 +550,40 @@ void Frame::AssignFeaturesToGrid()
     }
 }
 
+void Frame::SetSuperPointMode(SuperPointExtractor* spExtractor, SuperPointExtractor* spExtractorRight)
+{
+    mbUseSuperPoint = true;
+    mpSPextractorLeft = spExtractor;
+    mpSPextractorRight = spExtractorRight;
+    mpORBextractorLeft = nullptr;
+    mpORBextractorRight = nullptr;
+    // Set scale level info from SuperPoint extractor
+    mnScaleLevels = mpSPextractorLeft->GetLevels();
+    mfScaleFactor = mpSPextractorLeft->GetScaleFactor();
+    mfLogScaleFactor = log(mfScaleFactor);
+    mvScaleFactors = mpSPextractorLeft->GetScaleFactors();
+    mvInvScaleFactors = mpSPextractorLeft->GetInverseScaleFactors();
+    mvLevelSigma2 = mpSPextractorLeft->GetScaleSigmaSquares();
+    mvInvLevelSigma2 = mpSPextractorLeft->GetInverseScaleSigmaSquares();
+}
+
 void Frame::ExtractORB(int flag, const cv::Mat &im, const int x0, const int x1)
 {
     vector<int> vLapping = {x0,x1};
-    if(flag==0)
-        monoLeft = (*mpORBextractorLeft)(im,cv::Mat(),mvKeys,mDescriptors,vLapping);
+    if(mbUseSuperPoint)
+    {
+        if(flag==0)
+            monoLeft = (*mpSPextractorLeft)(im,cv::Mat(),mvKeys,mDescriptors,vLapping);
+        else
+            monoRight = (*mpSPextractorRight)(im,cv::Mat(),mvKeysRight,mDescriptorsRight,vLapping);
+    }
     else
-        monoRight = (*mpORBextractorRight)(im,cv::Mat(),mvKeysRight,mDescriptorsRight,vLapping);
+    {
+        if(flag==0)
+            monoLeft = (*mpORBextractorLeft)(im,cv::Mat(),mvKeys,mDescriptors,vLapping);
+        else
+            monoRight = (*mpORBextractorRight)(im,cv::Mat(),mvKeysRight,mDescriptorsRight,vLapping);
+    }
 }
 
 bool Frame::isSet() const {
@@ -740,7 +902,10 @@ void Frame::ComputeBoW()
     if(mBowVec.empty())
     {
         vector<cv::Mat> vCurrentDesc = Converter::toDescriptorVector(mDescriptors);
-        mpORBvocabulary->transform(vCurrentDesc,mBowVec,mFeatVec,4);
+        if(mbUseSuperPoint && mpSPVocabulary)
+            mpSPVocabulary->transform(vCurrentDesc,mBowVec,mFeatVec,4);
+        else if(mpORBvocabulary)
+            mpORBvocabulary->transform(vCurrentDesc,mBowVec,mFeatVec,4);
     }
 }
 
@@ -813,9 +978,11 @@ void Frame::ComputeStereoMatches()
     mvuRight = vector<float>(N,-1.0f);
     mvDepth = vector<float>(N,-1.0f);
 
-    const int thOrbDist = (ORBmatcher::TH_HIGH+ORBmatcher::TH_LOW)/2;
+    const float thOrbDist = (ORBmatcher::TH_HIGH+ORBmatcher::TH_LOW)/2;
 
-    const int nRows = mpORBextractorLeft->mvImagePyramid[0].rows;
+    const int nRows = mbUseSuperPoint ?
+        mpSPextractorLeft->mvImagePyramid[0].rows :
+        mpORBextractorLeft->mvImagePyramid[0].rows;
 
     //Assign keypoints to row table
     vector<vector<size_t> > vRowIndices(nRows,vector<size_t>());
@@ -864,7 +1031,7 @@ void Frame::ComputeStereoMatches()
         if(maxU<0)
             continue;
 
-        int bestDist = ORBmatcher::TH_HIGH;
+        float bestDist = ORBmatcher::TH_HIGH;
         size_t bestIdxR = 0;
 
         const cv::Mat &dL = mDescriptors.row(iL);
@@ -883,7 +1050,7 @@ void Frame::ComputeStereoMatches()
             if(uR>=minU && uR<=maxU)
             {
                 const cv::Mat &dR = mDescriptorsRight.row(iR);
-                const int dist = ORBmatcher::DescriptorDistance(dL,dR);
+                const float dist = ORBmatcher::DescriptorDistance(dL,dR);
 
                 if(dist<bestDist)
                 {
@@ -905,9 +1072,11 @@ void Frame::ComputeStereoMatches()
 
             // sliding window search
             const int w = 5;
-            cv::Mat IL = mpORBextractorLeft->mvImagePyramid[kpL.octave].rowRange(scaledvL-w,scaledvL+w+1).colRange(scaleduL-w,scaleduL+w+1);
+            cv::Mat IL = mbUseSuperPoint ?
+                mpSPextractorLeft->mvImagePyramid[kpL.octave].rowRange(scaledvL-w,scaledvL+w+1).colRange(scaleduL-w,scaleduL+w+1) :
+                mpORBextractorLeft->mvImagePyramid[kpL.octave].rowRange(scaledvL-w,scaledvL+w+1).colRange(scaleduL-w,scaleduL+w+1);
 
-            int bestDist = INT_MAX;
+            float bestDist = FLT_MAX;
             int bestincR = 0;
             const int L = 5;
             vector<float> vDists;
@@ -915,12 +1084,16 @@ void Frame::ComputeStereoMatches()
 
             const float iniu = scaleduR0+L-w;
             const float endu = scaleduR0+L+w+1;
-            if(iniu<0 || endu >= mpORBextractorRight->mvImagePyramid[kpL.octave].cols)
+            if(iniu<0 || endu >= (mbUseSuperPoint ?
+                mpSPextractorRight->mvImagePyramid[kpL.octave].cols :
+                mpORBextractorRight->mvImagePyramid[kpL.octave].cols))
                 continue;
 
             for(int incR=-L; incR<=+L; incR++)
             {
-                cv::Mat IR = mpORBextractorRight->mvImagePyramid[kpL.octave].rowRange(scaledvL-w,scaledvL+w+1).colRange(scaleduR0+incR-w,scaleduR0+incR+w+1);
+                cv::Mat IR = mbUseSuperPoint ?
+                    mpSPextractorRight->mvImagePyramid[kpL.octave].rowRange(scaledvL-w,scaledvL+w+1).colRange(scaleduR0+incR-w,scaleduR0+incR+w+1) :
+                    mpORBextractorRight->mvImagePyramid[kpL.octave].rowRange(scaledvL-w,scaledvL+w+1).colRange(scaleduR0+incR-w,scaleduR0+incR+w+1);
 
                 float dist = cv::norm(IL,IR,cv::NORM_L1);
                 if(dist<bestDist)
@@ -1044,15 +1217,28 @@ Frame::Frame(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timeSt
     mnId=nNextId++;
 
     // Scale Level Info
-    mnScaleLevels = mpORBextractorLeft->GetLevels();
-    mfScaleFactor = mpORBextractorLeft->GetScaleFactor();
-    mfLogScaleFactor = log(mfScaleFactor);
-    mvScaleFactors = mpORBextractorLeft->GetScaleFactors();
-    mvInvScaleFactors = mpORBextractorLeft->GetInverseScaleFactors();
-    mvLevelSigma2 = mpORBextractorLeft->GetScaleSigmaSquares();
-    mvInvLevelSigma2 = mpORBextractorLeft->GetInverseScaleSigmaSquares();
+    if(mbUseSuperPoint)
+    {
+        mnScaleLevels = mpSPextractorLeft->GetLevels();
+        mfScaleFactor = mpSPextractorLeft->GetScaleFactor();
+        mfLogScaleFactor = log(mfScaleFactor);
+        mvScaleFactors = mpSPextractorLeft->GetScaleFactors();
+        mvInvScaleFactors = mpSPextractorLeft->GetInverseScaleFactors();
+        mvLevelSigma2 = mpSPextractorLeft->GetScaleSigmaSquares();
+        mvInvLevelSigma2 = mpSPextractorLeft->GetInverseScaleSigmaSquares();
+    }
+    else
+    {
+        mnScaleLevels = mpORBextractorLeft->GetLevels();
+        mfScaleFactor = mpORBextractorLeft->GetScaleFactor();
+        mfLogScaleFactor = log(mfScaleFactor);
+        mvScaleFactors = mpORBextractorLeft->GetScaleFactors();
+        mvInvScaleFactors = mpORBextractorLeft->GetInverseScaleFactors();
+        mvLevelSigma2 = mpORBextractorLeft->GetScaleSigmaSquares();
+        mvInvLevelSigma2 = mpORBextractorLeft->GetInverseScaleSigmaSquares();
+    }
 
-    // ORB extraction
+    // Feature extraction
 #ifdef REGISTER_TIMES
     std::chrono::steady_clock::time_point time_StartExtORB = std::chrono::steady_clock::now();
 #endif

@@ -29,6 +29,8 @@
 
 #include "ImuTypes.h"
 #include "ORBVocabulary.h"
+#include "SuperPointVocabulary.h"
+#include "SuperPointExtractor.h"
 
 #include "Converter.h"
 #include "Settings.h"
@@ -67,6 +69,9 @@ public:
     // Constructor for Monocular cameras.
     Frame(const cv::Mat &imGray, const double &timeStamp, ORBextractor* extractor,ORBVocabulary* voc, GeometricCamera* pCamera, cv::Mat &distCoef, const float &bf, const float &thDepth, Frame* pPrevF = static_cast<Frame*>(NULL), const IMU::Calib &ImuCalib = IMU::Calib());
 
+    // Constructor for Monocular cameras with SuperPoint.
+    Frame(const cv::Mat &imGray, const double &timeStamp, SuperPointExtractor* extractor, SuperPointVocabulary* voc, GeometricCamera* pCamera, cv::Mat &distCoef, const float &bf, const float &thDepth, Frame* pPrevF = static_cast<Frame*>(NULL), const IMU::Calib &ImuCalib = IMU::Calib());
+
     // Destructor
     // ~Frame();
 
@@ -75,6 +80,9 @@ public:
 
     // Compute Bag of Words representation.
     void ComputeBoW();
+
+    // Set SuperPoint feature extractor mode
+    void SetSuperPointMode(SuperPointExtractor* spExtractor, SuperPointExtractor* spExtractorRight = nullptr);
 
     // Set the camera pose. (Imu pose is not modified!)
     void SetPose(const Sophus::SE3<float> &Tcw);
@@ -191,9 +199,14 @@ public:
 
     // Vocabulary used for relocalization.
     ORBVocabulary* mpORBvocabulary;
+    SuperPointVocabulary* mpSPVocabulary = nullptr;
 
     // Feature extractor. The right is used only in the stereo case.
     ORBextractor* mpORBextractorLeft, *mpORBextractorRight;
+    SuperPointExtractor* mpSPextractorLeft = nullptr, *mpSPextractorRight = nullptr;
+
+    // Feature type flag
+    bool mbUseSuperPoint = false;
 
     // Frame timestamp.
     double mTimeStamp;

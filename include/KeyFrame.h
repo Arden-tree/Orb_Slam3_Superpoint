@@ -19,6 +19,7 @@
 
 #ifndef KEYFRAME_H
 #define KEYFRAME_H
+#include <limits>
 
 #include "MapPoint.h"
 #include "Thirdparty/DBoW2/DBoW2/BowVector.h"

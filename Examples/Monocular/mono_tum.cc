@@ -47,8 +47,12 @@ int main(int argc, char **argv)
     int nImages = vstrImageFilenames.size();
 
     // Create SLAM system. It initializes all system threads and gets ready to process frames.
-    ORB_SLAM3::System SLAM(argv[1],argv[2],ORB_SLAM3::System::MONOCULAR,true);
+    ORB_SLAM3::System SLAM(argv[1],argv[2],ORB_SLAM3::System::MONOCULAR,false);
+
+    cout << "[TEST] SLAM System created successfully" << endl;
     float imageScale = SLAM.GetImageScale();
+    cout << "[TEST] Image scale: " << imageScale << endl;
+    cout << "[TEST] Number of images: " << nImages << endl;
 
     // Vector for tracking time statistics
     vector<float> vTimesTrack;
@@ -68,6 +72,9 @@ int main(int argc, char **argv)
         // Read image from file
         im = cv::imread(string(argv[3])+"/"+vstrImageFilenames[ni],cv::IMREAD_UNCHANGED); //,cv::IMREAD_UNCHANGED);
         double tframe = vTimestamps[ni];
+
+        if(ni % 50 == 0)
+            cout << "[TEST] Processing frame " << ni << "/" << nImages << endl;
 
         if(im.empty())
         {
@@ -122,6 +129,11 @@ int main(int argc, char **argv)
         double ttrack= std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count();
 
         vTimesTrack[ni]=ttrack;
+
+        if(ni % 50 == 0)
+        {
+            cout << "[TEST] Frame " << ni << "/" << nImages << " tracked in " << ttrack << "s" << endl;
+        }
 
         // Wait to load the next frame
         double T=0;

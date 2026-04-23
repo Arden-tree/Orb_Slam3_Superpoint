@@ -1,0 +1,80 @@
+%YAML:1.0
+
+#--------------------------------------------------------------------------------------------
+# SuperPoint Configuration for ORB-SLAM3
+#--------------------------------------------------------------------------------------------
+File.version: "1.0"
+
+Camera.type: "PinHole"
+
+# Camera calibration and distortion parameters (OpenCV)
+Camera1.fx: 517.306408
+Camera1.fy: 516.469215
+Camera1.cx: 318.643040
+Camera1.cy: 255.313989
+
+Camera1.k1: 0.262383
+Camera1.k2: -0.953104
+Camera1.p1: -0.005358
+Camera1.p2: 0.002628
+Camera1.k3: 1.163314
+
+Camera.fps: 30
+Camera.RGB: 1
+Camera.width: 640
+Camera.height: 480
+
+#--------------------------------------------------------------------------------------------
+# Feature Extractor Selection
+#--------------------------------------------------------------------------------------------
+Feature.type: "SuperPoint"
+
+#--------------------------------------------------------------------------------------------
+# SuperPoint Parameters
+#--------------------------------------------------------------------------------------------
+
+# Number of features per image
+SuperPoint.nFeatures: 1000
+
+# Scale pyramid levels (SuperPoint is single-scale, but kept for compatibility)
+SuperPoint.nLevels: 1
+SuperPoint.scaleFactor: 2.0
+
+# Confidence threshold for keypoint selection (repurposed from iniThFAST)
+# Default: 0.015. Higher = fewer but more confident keypoints
+SuperPoint.confThreshold: 0.015
+
+# NMS radius in feature map pixels (feature map is 1/8 of input)
+# Default: 4 (corresponds to 32 pixels in original image)
+SuperPoint.nmsRadius: 4
+
+# ONNX model path
+SuperPoint.modelPath: "/home/yuan/ORB_SLAM3/Models/superpoint_v1.onnx"
+
+# Descriptor distance thresholds (L2 distance for L2-normalized vectors)
+# Range: [0, sqrt(2)] where 0=identical, sqrt(2)=orthogonal
+SuperPoint.thLow: 0.7
+SuperPoint.thHigh: 1.0
+
+#--------------------------------------------------------------------------------------------
+# ORB Parameters (used only when Feature.type == "ORB")
+#--------------------------------------------------------------------------------------------
+ORBextractor.nFeatures: 1000
+ORBextractor.scaleFactor: 1.2
+ORBextractor.nLevels: 8
+ORBextractor.iniThFAST: 20
+ORBextractor.minThFAST: 7
+
+#--------------------------------------------------------------------------------------------
+# Viewer Parameters
+#--------------------------------------------------------------------------------------------
+Viewer.KeyFrameSize: 0.05
+Viewer.KeyFrameLineWidth: 1.0
+Viewer.GraphLineWidth: 0.9
+Viewer.PointSize: 2.0
+Viewer.CameraSize: 0.08
+Viewer.CameraLineWidth: 3.0
+Viewer.ViewpointX: 0.0
+Viewer.ViewpointY: -0.7
+Viewer.ViewpointZ: -1.8
+Viewer.ViewpointF: 500.0

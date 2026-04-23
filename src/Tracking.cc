@@ -49,6 +49,7 @@ Tracking::Tracking(System *pSys, ORBVocabulary* pVoc, FrameDrawer *pFrameDrawer,
     mnInitialFrameId(0), mbCreatedMap(false), mnFirstFrameId(0), mpCamera2(nullptr), mpLastKeyFrame(static_cast<KeyFrame*>(NULL))
 {
     // Load camera parameters from settings file
+    mStrSettingPath = strSettingPath;
     if(settings){
         newParameterLoader(settings);
     }
@@ -585,20 +586,53 @@ void Tracking::newParameterLoader(Settings *settings) {
     mMaxFrames = settings->fps();
     mbRGB = settings->rgb();
 
-    //ORB parameters
-    int nFeatures = settings->nFeatures();
-    int nLevels = settings->nLevels();
-    int fIniThFAST = settings->initThFAST();
-    int fMinThFAST = settings->minThFAST();
-    float fScaleFactor = settings->scaleFactor();
+    // Check if SuperPoint mode
+    mbUseSuperPoint = false;
+    {
+        cv::FileStorage fCheck(mStrSettingPath, cv::FileStorage::READ);
+        cv::FileNode featType = fCheck["Feature.type"];
+        if(!featType.empty() && featType.isString() && (string)featType == "SuperPoint")
+        {
+            mbUseSuperPoint = true;
+        }
+    }
 
-    mpORBextractorLeft = new ORBextractor(nFeatures,fScaleFactor,nLevels,fIniThFAST,fMinThFAST);
+    if(mbUseSuperPoint)
+    {
+        // Read SuperPoint parameters from YAML
+        cv::FileStorage fSP(mStrSettingPath, cv::FileStorage::READ);
+        std::string strModelPath = fSP["SuperPoint.modelPath"].empty() ? "" : (string)fSP["SuperPoint.modelPath"];
+        float fConfThresh = fSP["SuperPoint.confThreshold"].empty() ? settings->initThFAST() / 1000.0f : (float)fSP["SuperPoint.confThreshold"];
+        float fNmsRadius = fSP["SuperPoint.nmsRadius"].empty() ? (float)settings->minThFAST() : (float)fSP["SuperPoint.nmsRadius"];
+        int nFeatures = fSP["SuperPoint.nFeatures"].empty() ? settings->nFeatures() : (int)fSP["SuperPoint.nFeatures"];
+        int nLevels = fSP["SuperPoint.nLevels"].empty() ? settings->nLevels() : (int)fSP["SuperPoint.nLevels"];
+        float fScaleFactor = fSP["SuperPoint.scaleFactor"].empty() ? settings->scaleFactor() : (float)fSP["SuperPoint.scaleFactor"];
 
-    if(mSensor==System::STEREO || mSensor==System::IMU_STEREO)
-        mpORBextractorRight = new ORBextractor(nFeatures,fScaleFactor,nLevels,fIniThFAST,fMinThFAST);
+        mpSPextractorLeft = new SuperPointExtractor(nFeatures, fScaleFactor, nLevels, fConfThresh, fNmsRadius, strModelPath);
+        if(mSensor==System::STEREO || mSensor==System::IMU_STEREO)
+            mpSPextractorRight = new SuperPointExtractor(nFeatures, fScaleFactor, nLevels, fConfThresh, fNmsRadius, strModelPath);
+        if(mSensor==System::MONOCULAR || mSensor==System::IMU_MONOCULAR)
+            mpIniSPextractor = new SuperPointExtractor(2*nFeatures, fScaleFactor, nLevels, fConfThresh, fNmsRadius, strModelPath);
 
-    if(mSensor==System::MONOCULAR || mSensor==System::IMU_MONOCULAR)
-        mpIniORBextractor = new ORBextractor(5*nFeatures,fScaleFactor,nLevels,fIniThFAST,fMinThFAST);
+        cerr << "[Tracking] SuperPoint extractor initialized" << endl;
+    }
+    else
+    {
+        //ORB parameters
+        int nFeatures = settings->nFeatures();
+        int nLevels = settings->nLevels();
+        int fIniThFAST = settings->initThFAST();
+        int fMinThFAST = settings->minThFAST();
+        float fScaleFactor = settings->scaleFactor();
+
+        mpORBextractorLeft = new ORBextractor(nFeatures,fScaleFactor,nLevels,fIniThFAST,fMinThFAST);
+
+        if(mSensor==System::STEREO || mSensor==System::IMU_STEREO)
+            mpORBextractorRight = new ORBextractor(nFeatures,fScaleFactor,nLevels,fIniThFAST,fMinThFAST);
+
+        if(mSensor==System::MONOCULAR || mSensor==System::IMU_MONOCULAR)
+            mpIniORBextractor = new ORBextractor(5*nFeatures,fScaleFactor,nLevels,fIniThFAST,fMinThFAST);
+    }
 
     //IMU parameters
     Sophus::SE3f Tbc = settings->Tbc();
@@ -1280,13 +1314,32 @@ bool Tracking::ParseORBParamFile(cv::FileStorage &fSettings)
         return false;
     }
 
-    mpORBextractorLeft = new ORBextractor(nFeatures,fScaleFactor,nLevels,fIniThFAST,fMinThFAST);
+    // Check if SuperPoint mode
+    cv::FileNode featType = fSettings["Feature.type"];
+    mbUseSuperPoint = false;
+    if(!featType.empty() && featType.isString() && (string)featType == "SuperPoint")
+    {
+        mbUseSuperPoint = true;
+        std::string strModelPath = fSettings["SuperPoint.modelPath"].empty() ? "" : (string)fSettings["SuperPoint.modelPath"];
+        float fConfThresh = fSettings["SuperPoint.confThreshold"].empty() ? fIniThFAST / 1000.0f : (float)fSettings["SuperPoint.confThreshold"];
+        float fNmsRadius = fSettings["SuperPoint.nmsRadius"].empty() ? (float)fMinThFAST : (float)fSettings["SuperPoint.nmsRadius"];
+        mpSPextractorLeft = new SuperPointExtractor(nFeatures,fScaleFactor,nLevels,fConfThresh,fNmsRadius,strModelPath);
+        if(mSensor==System::STEREO || mSensor==System::IMU_STEREO)
+            mpSPextractorRight = new SuperPointExtractor(nFeatures,fScaleFactor,nLevels,fConfThresh,fNmsRadius,strModelPath);
+        if(mSensor==System::MONOCULAR || mSensor==System::IMU_MONOCULAR)
+            mpIniSPextractor = new SuperPointExtractor(2*nFeatures,fScaleFactor,nLevels,fConfThresh,fNmsRadius,strModelPath);
+        cerr << "[Tracking] SuperPoint extractor initialized" << endl;
+    }
+    else
+    {
+        mpORBextractorLeft = new ORBextractor(nFeatures,fScaleFactor,nLevels,fIniThFAST,fMinThFAST);
 
-    if(mSensor==System::STEREO || mSensor==System::IMU_STEREO)
-        mpORBextractorRight = new ORBextractor(nFeatures,fScaleFactor,nLevels,fIniThFAST,fMinThFAST);
+        if(mSensor==System::STEREO || mSensor==System::IMU_STEREO)
+            mpORBextractorRight = new ORBextractor(nFeatures,fScaleFactor,nLevels,fIniThFAST,fMinThFAST);
 
-    if(mSensor==System::MONOCULAR || mSensor==System::IMU_MONOCULAR)
-        mpIniORBextractor = new ORBextractor(5*nFeatures,fScaleFactor,nLevels,fIniThFAST,fMinThFAST);
+        if(mSensor==System::MONOCULAR || mSensor==System::IMU_MONOCULAR)
+            mpIniORBextractor = new ORBextractor(5*nFeatures,fScaleFactor,nLevels,fIniThFAST,fMinThFAST);
+    }
 
     cout << endl << "ORB Extractor Parameters: " << endl;
     cout << "- Number of Features: " << nFeatures << endl;
@@ -1504,6 +1557,15 @@ Sophus::SE3f Tracking::GrabImageStereo(const cv::Mat &imRectLeft, const cv::Mat 
     mCurrentFrame.mNameFile = filename;
     mCurrentFrame.mnDataset = mnNumDataset;
 
+    // Configure SuperPoint if enabled
+    if(mbUseSuperPoint)
+    {
+        mCurrentFrame.mbUseSuperPoint = true;
+        mCurrentFrame.mpSPextractorLeft = mpSPextractorLeft;
+        mCurrentFrame.mpSPextractorRight = mpSPextractorRight;
+        mCurrentFrame.mpSPVocabulary = nullptr;  // No SP vocabulary for initial validation
+    }
+
 #ifdef REGISTER_TIMES
     vdORBExtract_ms.push_back(mCurrentFrame.mTimeORB_Ext);
     vdStereoMatch_ms.push_back(mCurrentFrame.mTimeStereoMatch);
@@ -1553,6 +1615,15 @@ Sophus::SE3f Tracking::GrabImageRGBD(const cv::Mat &imRGB,const cv::Mat &imD, co
     mCurrentFrame.mNameFile = filename;
     mCurrentFrame.mnDataset = mnNumDataset;
 
+    // Configure SuperPoint if enabled
+    if(mbUseSuperPoint)
+    {
+        mCurrentFrame.mbUseSuperPoint = true;
+        mCurrentFrame.mpSPextractorLeft = mpSPextractorLeft;
+        mCurrentFrame.mpSPextractorRight = mpSPextractorRight;
+        mCurrentFrame.mpSPVocabulary = nullptr;
+    }
+
 #ifdef REGISTER_TIMES
     vdORBExtract_ms.push_back(mCurrentFrame.mTimeORB_Ext);
 #endif
@@ -1583,10 +1654,20 @@ Sophus::SE3f Tracking::GrabImageMonocular(const cv::Mat &im, const double &times
 
     if (mSensor == System::MONOCULAR)
     {
-        if(mState==NOT_INITIALIZED || mState==NO_IMAGES_YET ||(lastID - initID) < mMaxFrames)
-            mCurrentFrame = Frame(mImGray,timestamp,mpIniORBextractor,mpORBVocabulary,mpCamera,mDistCoef,mbf,mThDepth);
+        if(mbUseSuperPoint)
+        {
+            if(mState==NOT_INITIALIZED || mState==NO_IMAGES_YET ||(lastID - initID) < mMaxFrames)
+                mCurrentFrame = Frame(mImGray,timestamp,mpIniSPextractor,static_cast<SuperPointVocabulary*>(nullptr),mpCamera,mDistCoef,mbf,mThDepth);
+            else
+                mCurrentFrame = Frame(mImGray,timestamp,mpSPextractorLeft,static_cast<SuperPointVocabulary*>(nullptr),mpCamera,mDistCoef,mbf,mThDepth);
+        }
         else
-            mCurrentFrame = Frame(mImGray,timestamp,mpORBextractorLeft,mpORBVocabulary,mpCamera,mDistCoef,mbf,mThDepth);
+        {
+            if(mState==NOT_INITIALIZED || mState==NO_IMAGES_YET ||(lastID - initID) < mMaxFrames)
+                mCurrentFrame = Frame(mImGray,timestamp,mpIniORBextractor,mpORBVocabulary,mpCamera,mDistCoef,mbf,mThDepth);
+            else
+                mCurrentFrame = Frame(mImGray,timestamp,mpORBextractorLeft,mpORBVocabulary,mpCamera,mDistCoef,mbf,mThDepth);
+        }
     }
     else if(mSensor == System::IMU_MONOCULAR)
     {
@@ -1626,7 +1707,7 @@ void Tracking::PreintegrateIMU()
 
     if(!mCurrentFrame.mpPrevFrame)
     {
-        Verbose::PrintMess("non prev frame ", Verbose::VERBOSITY_NORMAL);
+        cout << "[PreIMU] No prev frame (first frame after reset)" << endl;
         mCurrentFrame.setIntegrated();
         return;
     }
@@ -1635,7 +1716,8 @@ void Tracking::PreintegrateIMU()
     mvImuFromLastFrame.reserve(mlQueueImuData.size());
     if(mlQueueImuData.size() == 0)
     {
-        Verbose::PrintMess("Not IMU data in mlQueueImuData!!", Verbose::VERBOSITY_NORMAL);
+        cout << "[PreIMU] Empty mlQueueImuData! frame_ts=" << mCurrentFrame.mTimeStamp
+             << " prev_ts=" << mCurrentFrame.mpPrevFrame->mTimeStamp << endl;
         mCurrentFrame.setIntegrated();
         return;
     }
@@ -1676,7 +1758,14 @@ void Tracking::PreintegrateIMU()
 
     const int n = mvImuFromLastFrame.size()-1;
     if(n==0){
-        cout << "Empty IMU measurements vector!!!\n";
+        cout << "[PreIMU] Empty mvImuFromLastFrame! queue_had=" << mlQueueImuData.size()
+             << " frame_ts=" << mCurrentFrame.mTimeStamp
+             << " prev_ts=" << mCurrentFrame.mpPrevFrame->mTimeStamp << endl;
+        // Print queue front/back timestamps if available
+        if(mlQueueImuData.size() > 0) {
+            cout << "[PreIMU] queue_front_t=" << mlQueueImuData.front().t
+                 << " queue_back_t=" << mlQueueImuData.back().t << endl;
+        }
         return;
     }
 
@@ -2340,7 +2429,8 @@ void Tracking::StereoInitialization()
         {
             if (!mCurrentFrame.mpImuPreintegrated || !mLastFrame.mpImuPreintegrated)
             {
-                cout << "not IMU meas" << endl;
+                cout << "not IMU meas (cur=" << (mCurrentFrame.mpImuPreintegrated?"OK":"NULL")
+                     << " last=" << (mLastFrame.mpImuPreintegrated?"OK":"NULL") << ")" << endl;
                 return;
             }
 
@@ -2451,6 +2541,7 @@ void Tracking::MonocularInitialization()
     if(!mbReadyToInitializate)
     {
         // Set Reference Frame
+        cerr << "[INIT] Frame keypoints: " << mCurrentFrame.mvKeys.size() << " (need >100)" << endl;
         if(mCurrentFrame.mvKeys.size()>100)
         {
 
@@ -2488,8 +2579,12 @@ void Tracking::MonocularInitialization()
         }
 
         // Find correspondences
-        ORBmatcher matcher(0.9,true);
+        // SuperPoint L2 matching: use stricter NN ratio for better precision
+        float fNNRatio = mbUseSuperPoint ? 0.7f : 0.9f;
+        ORBmatcher matcher(fNNRatio, true);
         int nmatches = matcher.SearchForInitialization(mInitialFrame,mCurrentFrame,mvbPrevMatched,mvIniMatches,100);
+
+        cerr << "[INIT] SearchForInitialization matches: " << nmatches << " (need >=100)" << endl;
 
         // Check if there are enough correspondences
         if(nmatches<100)
@@ -3798,7 +3893,8 @@ void Tracking::Reset(bool bLocMap)
 
     // Reset Loop Closing
     Verbose::PrintMess("Reseting Loop Closing...", Verbose::VERBOSITY_NORMAL);
-    mpLoopClosing->RequestReset();
+    if(mpLoopClosing)
+        mpLoopClosing->RequestReset();
     Verbose::PrintMess("done", Verbose::VERBOSITY_NORMAL);
 
     // Clear BoW Database
@@ -3858,7 +3954,8 @@ void Tracking::ResetActiveMap(bool bLocMap)
 
     // Reset Loop Closing
     Verbose::PrintMess("Reseting Loop Closing...", Verbose::VERBOSITY_NORMAL);
-    mpLoopClosing->RequestResetActiveMap(pMap);
+    if(mpLoopClosing)
+        mpLoopClosing->RequestResetActiveMap(pMap);
     Verbose::PrintMess("done", Verbose::VERBOSITY_NORMAL);
 
     // Clear BoW Database
@@ -3875,6 +3972,12 @@ void Tracking::ResetActiveMap(bool bLocMap)
     mnLastInitFrameId = Frame::nNextId;
     //mnLastRelocFrameId = mnLastInitFrameId;
     mState = NO_IMAGES_YET; //NOT_INITIALIZED;
+
+    // Clear IMU queue to discard stale measurements from before the reset
+    {
+        unique_lock<mutex> lock(mMutexImuQueue);
+        mlQueueImuData.clear();
+    }
 
     mbReadyToInitializate = false;
 

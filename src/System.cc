@@ -19,6 +19,8 @@
 
 
 #include "System.h"
+#include "SuperPointExtractor.h"
+#include "ORBmatcher.h"
 #include "Converter.h"
 #include <thread>
 #include <pangolin/pangolin.h>
@@ -32,7 +34,7 @@
 #include <boost/archive/binary_oarchive.hpp>
 #include <boost/archive/xml_iarchive.hpp>
 #include <boost/archive/xml_oarchive.hpp>
-
+#include <unistd.h>
 namespace ORB_SLAM3
 {
 
@@ -105,27 +107,67 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
         activeLC = static_cast<int>(fsSettings["loopClosing"]) != 0;
     }
 
+    // Check feature type
+    node = fsSettings["Feature.type"];
+    mbUseSuperPoint = false;
+    if(!node.empty() && node.isString() && (string)node == "SuperPoint")
+    {
+        mbUseSuperPoint = true;
+        // Set matching thresholds for SuperPoint (L2 distance)
+        ORBmatcher::TH_LOW = fsSettings["SuperPoint.thLow"].empty() ? 0.7f : (float)fsSettings["SuperPoint.thLow"];
+        ORBmatcher::TH_HIGH = fsSettings["SuperPoint.thHigh"].empty() ? 1.0f : (float)fsSettings["SuperPoint.thHigh"];
+        cout << "[System] Using SuperPoint feature extractor" << endl;
+        cout << "[System] TH_LOW=" << ORBmatcher::TH_LOW << " TH_HIGH=" << ORBmatcher::TH_HIGH << endl;
+        // Disable loop closing for initial SuperPoint validation
+        activeLC = false;
+        cout << "[System] Loop closing disabled for SuperPoint mode" << endl;
+    }
+
     mStrVocabularyFilePath = strVocFile;
 
     bool loadedAtlas = false;
 
     if(mStrLoadAtlasFromFile.empty())
     {
-        //Load ORB Vocabulary
-        cout << endl << "Loading ORB Vocabulary. This could take a while..." << endl;
-
-        mpVocabulary = new ORBVocabulary();
-        bool bVocLoad = mpVocabulary->loadFromTextFile(strVocFile);
-        if(!bVocLoad)
+        if(mbUseSuperPoint)
         {
-            cerr << "Wrong path to vocabulary. " << endl;
-            cerr << "Falied to open at: " << strVocFile << endl;
-            exit(-1);
+            // Load SuperPoint Vocabulary
+            cout << endl << "Loading SuperPoint Vocabulary..." << endl;
+
+            mpSPVocabulary = new SuperPointVocabulary();
+            bool bVocLoad = mpSPVocabulary->loadFromTextFile(strVocFile);
+            if(!bVocLoad)
+            {
+                cerr << "Wrong path to SuperPoint vocabulary: " << strVocFile << endl;
+                exit(-1);
+            }
+            cout << "SuperPoint Vocabulary loaded! (" << mpSPVocabulary->size() << " words)" << endl << endl;
+
+            // ORB vocabulary is not used in SP mode; leave mpVocabulary as nullptr
+            // ComputeBoW() in KeyFrame.cc has null check for this
+            mpVocabulary = nullptr;
         }
-        cout << "Vocabulary loaded!" << endl << endl;
+        else
+        {
+            //Load ORB Vocabulary
+            cout << endl << "Loading ORB Vocabulary. This could take a while..." << endl;
+
+            mpVocabulary = new ORBVocabulary();
+            bool bVocLoad = mpVocabulary->loadFromTextFile(strVocFile);
+            if(!bVocLoad)
+            {
+                cerr << "Wrong path to vocabulary. " << endl;
+                cerr << "Falied to open at: " << strVocFile << endl;
+                exit(-1);
+            }
+            cout << "Vocabulary loaded!" << endl << endl;
+        }
 
         //Create KeyFrame Database
-        mpKeyFrameDatabase = new KeyFrameDatabase(*mpVocabulary);
+        if(mpVocabulary)
+            mpKeyFrameDatabase = new KeyFrameDatabase(*mpVocabulary);
+        else
+            mpKeyFrameDatabase = new KeyFrameDatabase();  // SP mode: empty KFD
 
         //Create the Atlas
         cout << "Initialization of Atlas from scratch " << endl;
@@ -210,18 +252,30 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
 
     //Initialize the Loop Closing thread and launch
     // mSensor!=MONOCULAR && mSensor!=IMU_MONOCULAR
-    mpLoopCloser = new LoopClosing(mpAtlas, mpKeyFrameDatabase, mpVocabulary, mSensor!=MONOCULAR, activeLC); // mSensor!=MONOCULAR);
-    mptLoopClosing = new thread(&ORB_SLAM3::LoopClosing::Run, mpLoopCloser);
+    if(activeLC)
+    {
+        mpLoopCloser = new LoopClosing(mpAtlas, mpKeyFrameDatabase, mpVocabulary, mSensor!=MONOCULAR, activeLC); // mSensor!=MONOCULAR);
+        mptLoopClosing = new thread(&ORB_SLAM3::LoopClosing::Run, mpLoopCloser);
 
-    //Set pointers between threads
-    mpTracker->SetLocalMapper(mpLocalMapper);
-    mpTracker->SetLoopClosing(mpLoopCloser);
+        //Set pointers between threads
+        mpTracker->SetLocalMapper(mpLocalMapper);
+        mpTracker->SetLoopClosing(mpLoopCloser);
 
-    mpLocalMapper->SetTracker(mpTracker);
-    mpLocalMapper->SetLoopCloser(mpLoopCloser);
+        mpLocalMapper->SetTracker(mpTracker);
+        mpLocalMapper->SetLoopCloser(mpLoopCloser);
 
-    mpLoopCloser->SetTracker(mpTracker);
-    mpLoopCloser->SetLocalMapper(mpLocalMapper);
+        mpLoopCloser->SetTracker(mpTracker);
+        mpLoopCloser->SetLocalMapper(mpLocalMapper);
+    }
+    else
+    {
+        // SuperPoint mode: skip LoopClosing to avoid BoW-related crashes
+        mpLoopCloser = static_cast<LoopClosing*>(NULL);
+        mpTracker->SetLocalMapper(mpLocalMapper);
+        mpTracker->SetLoopClosing(static_cast<LoopClosing*>(NULL));
+        mpLocalMapper->SetTracker(mpTracker);
+        mpLocalMapper->SetLoopCloser(static_cast<LoopClosing*>(NULL));
+    }
 
     //usleep(10*1000*1000);
 
@@ -232,7 +286,8 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
         mpViewer = new Viewer(this, mpFrameDrawer,mpMapDrawer,mpTracker,strSettingsFile,settings_);
         mptViewer = new thread(&Viewer::Run, mpViewer);
         mpTracker->SetViewer(mpViewer);
-        mpLoopCloser->mpViewer = mpViewer;
+        if(mpLoopCloser)
+            mpLoopCloser->mpViewer = mpViewer;
         mpViewer->both = mpFrameDrawer->both;
     }
 
@@ -522,7 +577,8 @@ void System::Shutdown()
     cout << "Shutdown" << endl;
 
     mpLocalMapper->RequestFinish();
-    mpLoopCloser->RequestFinish();
+    if(mpLoopCloser)
+        mpLoopCloser->RequestFinish();
     /*if(mpViewer)
     {
         mpViewer->RequestFinish();

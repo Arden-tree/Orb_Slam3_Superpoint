@@ -24,6 +24,7 @@
 #include"MapPoint.h"
 #include"KeyFrame.h"
 #include "Settings.h"
+#include<epoxy/gl.h>
 #include<pangolin/pangolin.h>
 
 #include<mutex>

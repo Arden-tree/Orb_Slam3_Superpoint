@@ -36,6 +36,7 @@
 #include "LoopClosing.h"
 #include "KeyFrameDatabase.h"
 #include "ORBVocabulary.h"
+#include "SuperPointVocabulary.h"
 #include "Viewer.h"
 #include "ImuTypes.h"
 #include "Settings.h"
@@ -204,6 +205,8 @@ private:
 
     // ORB vocabulary used for place recognition and feature matching.
     ORBVocabulary* mpVocabulary;
+    SuperPointVocabulary* mpSPVocabulary = nullptr;
+    bool mbUseSuperPoint = false;
 
     // KeyFrame database for place recognition (relocalization and loop detection).
     KeyFrameDatabase* mpKeyFrameDatabase;

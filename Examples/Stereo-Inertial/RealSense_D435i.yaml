@@ -1,25 +1,40 @@
 %YAML:1.0
+# RealSense D435i Configuration for 30 FPS Stereo-Inertial SLAM
 
 #--------------------------------------------------------------------------------------------
-# Camera Parameters. Adjust them!
+# Camera Parameters
 #--------------------------------------------------------------------------------------------
 File.version: "1.0"
 
-Camera.type: "Rectified"
+Camera.type: "PinHole"
 
-# Rectified Camera calibration (OpenCV)
-Camera1.fx: 382.613
-Camera1.fy: 382.613
-Camera1.cx: 320.183
-Camera1.cy: 236.455
+# Camera1 (Left) calibration and distortion parameters (OpenCV)
+Camera1.fx: 381.781
+Camera1.fy: 381.781
+Camera1.cx: 319.946
+Camera1.cy: 236.893
 
-Stereo.b: 0.0499585
+Camera1.k1: 0.0
+Camera1.k2: 0.0
+Camera1.p1: 0.0
+Camera1.p2: 0.0
+
+# Camera2 (Right) calibration and distortion parameters (OpenCV)
+Camera2.fx: 381.781
+Camera2.fy: 381.781
+Camera2.cx: 319.946
+Camera2.cy: 236.893
+
+Camera2.k1: 0.0
+Camera2.k2: 0.0
+Camera2.p1: 0.0
+Camera2.p2: 0.0
 
 # Camera resolution
 Camera.width: 640
 Camera.height: 480
 
-# Camera frames per second 
+# Camera frames per second
 Camera.fps: 30
 
 # Color order of the images (0: BGR, 1: RGB. It is ignored if images are grayscale)
@@ -28,48 +43,52 @@ Camera.RGB: 1
 # Close/Far threshold. Baseline times.
 Stereo.ThDepth: 40.0
 
-# Transformation from body-frame (imu) to left camera
+# Transformation from left to right camera (stereo baseline ~50mm for D435i)
+Stereo.T_c1_c2: !!opencv-matrix
+  rows: 4
+  cols: 4
+  dt: f
+  data: [1.0, 0.0, 0.0, 0.05,
+         0.0, 1.0, 0.0, 0.0,
+         0.0, 0.0, 1.0, 0.0,
+         0.0, 0.0, 0.0, 1.0]
+
+#--------------------------------------------------------------------------------------------
+# IMU Parameters
+#--------------------------------------------------------------------------------------------
+
+# Transformation from camera 0 to body-frame (imu)
 IMU.T_b_c1: !!opencv-matrix
-   rows: 4
-   cols: 4
-   dt: f
-   data: [1.0, 0.0, 0.0, -0.005,
-          0.0, 1.0, 0.0, -0.005,
-          0.0, 0.0, 1.0, 0.0117,
-          0.0, 0.0, 0.0, 1.0]
+  rows: 4
+  cols: 4
+  dt: f
+  data: [1.0, 0.0, 0.0, -0.015,
+         0.0, 1.0, 0.0, 0.0,
+         0.0, 0.0, 1.0, 0.0,
+         0.0, 0.0, 0.0, 1.0]
 
-# Do not insert KFs when recently lost
-IMU.InsertKFsWhenLost: 0
-
-# IMU noise (Use those from VINS-mono)
-IMU.NoiseGyro: 1e-3 # 2.44e-4 #1e-3 # rad/s^0.5
-IMU.NoiseAcc: 1e-2 # 1.47e-3 #1e-2 # m/s^1.5
-IMU.GyroWalk: 1e-6 # rad/s^1.5
-IMU.AccWalk: 1e-4 # m/s^2.5
+# IMU noise
+IMU.NoiseGyro: 1e-3
+IMU.NoiseAcc: 1e-2
+IMU.GyroWalk: 1e-6
+IMU.AccWalk: 1e-4
 IMU.Frequency: 200.0
+IMU.fastInit: 1
 
 #--------------------------------------------------------------------------------------------
 # ORB Parameters
 #--------------------------------------------------------------------------------------------
-# ORB Extractor: Number of features per image
-ORBextractor.nFeatures: 1250
-
-# ORB Extractor: Scale factor between levels in the scale pyramid 	
+ORBextractor.nFeatures: 1500
 ORBextractor.scaleFactor: 1.2
-
-# ORB Extractor: Number of levels in the scale pyramid	
 ORBextractor.nLevels: 8
-
-# ORB Extractor: Fast threshold
-# Image is divided in a grid. At each cell FAST are extracted imposing a minimum response.
-# Firstly we impose iniThFAST. If no corners are detected we impose a lower value minThFAST
-# You can lower these values if your images have low contrast			
-ORBextractor.iniThFAST: 20
+ORBextractor.iniThFAST: 15          # Slightly lower for 90 FPS (was 20)
 ORBextractor.minThFAST: 7
 
 #--------------------------------------------------------------------------------------------
 # Viewer Parameters
 #--------------------------------------------------------------------------------------------
+Viewer.View: 0                 # 虚拟机里务必保持为 0，先跑通算法
+Viewer.imageViewScale: 1.0      
 Viewer.KeyFrameSize: 0.05
 Viewer.KeyFrameLineWidth: 1.0
 Viewer.GraphLineWidth: 0.9
