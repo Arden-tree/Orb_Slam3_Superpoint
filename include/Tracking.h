@@ -87,6 +87,8 @@ public:
     // The focal lenght should be similar or scale prediction will fail when projecting points
     void ChangeCalibration(const string &strSettingPath);
 
+    void SetSuperPointVocabulary(SuperPointVocabulary* pSPVoc) { mpSPVocabulary = pSPVoc; }
+
     // Use this function if you have deactivated local mapping and you only want to localize the camera.
     void InformOnlyTracking(const bool &flag);
 
@@ -269,6 +271,7 @@ protected:
 
     //BoW
     ORBVocabulary* mpORBVocabulary;
+    SuperPointVocabulary* mpSPVocabulary = nullptr;
     KeyFrameDatabase* mpKeyFrameDB;
 
     // Initalization (only for monocular)

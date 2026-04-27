@@ -27,6 +27,7 @@
 #include "KeyFrame.h"
 #include "Frame.h"
 #include "ORBVocabulary.h"
+#include "SuperPointVocabulary.h"
 #include "Map.h"
 
 #include <boost/serialization/base_object.hpp>
@@ -59,6 +60,7 @@ public:
 
     KeyFrameDatabase(){}
     KeyFrameDatabase(const ORBVocabulary &voc);
+    KeyFrameDatabase(const SuperPointVocabulary &voc);
 
     void add(KeyFrame* pKF);
 
@@ -81,11 +83,14 @@ public:
     void PreSave();
     void PostLoad(map<long unsigned int, KeyFrame*> mpKFid);
     void SetORBVocabulary(ORBVocabulary* pORBVoc);
+    void SetSuperPointVocabulary(SuperPointVocabulary* pSPVoc);
 
 protected:
 
    // Associated vocabulary
-   const ORBVocabulary* mpVoc;
+   const ORBVocabulary* mpVoc = nullptr;
+   const SuperPointVocabulary* mpSPVoc = nullptr;
+   bool mbUseSuperPoint = false;
 
    // Inverted file
    std::vector<list<KeyFrame*> > mvInvertedFile;

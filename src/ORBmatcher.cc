@@ -231,6 +231,18 @@ namespace ORB_SLAM3
 
         int nmatches=0;
 
+        // Diagnostic: check FeatureVector overlap for SuperPoint
+        if(F.mDescriptors.type() == CV_32F) {
+            static int logCount = 0;
+            if(logCount < 5) {
+                cout << "[SearchByBoW] KF mFeatVec size=" << vFeatVecKF.size()
+                     << " Frame mFeatVec size=" << F.mFeatVec.size()
+                     << " KF mBowVec size=" << pKF->mBowVec.size()
+                     << " Frame mBowVec size=" << F.mBowVec.size() << endl;
+                logCount++;
+            }
+        }
+
         vector<int> rotHist[HISTO_LENGTH];
         for(int i=0;i<HISTO_LENGTH;i++)
             rotHist[i].reserve(500);
@@ -421,6 +433,10 @@ namespace ORB_SLAM3
                 }
             }
         }
+
+        if(F.mDescriptors.type() == CV_32F && nmatches < 15)
+            cout << "[SearchByBoW] KF-Frame: nmatches=" << nmatches
+                 << " TH_LOW=" << TH_LOW << " ratio=" << mfNNratio << endl;
 
         return nmatches;
     }
@@ -1883,6 +1899,10 @@ namespace ORB_SLAM3
                 }
             }
         }
+
+        if(CurrentFrame.mDescriptors.type() == CV_32F && nmatches < 20)
+            cout << "[SearchByProjection] Frame-LastFrame: nmatches=" << nmatches
+                 << " TH_HIGH=" << TH_HIGH << endl;
 
         return nmatches;
     }

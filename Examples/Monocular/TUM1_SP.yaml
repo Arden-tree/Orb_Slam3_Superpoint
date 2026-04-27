@@ -34,7 +34,7 @@ Feature.type: "SuperPoint"
 #--------------------------------------------------------------------------------------------
 
 # Number of features per image
-SuperPoint.nFeatures: 1000
+SuperPoint.nFeatures: 2000
 
 # Scale pyramid levels (SuperPoint is single-scale, but kept for compatibility)
 SuperPoint.nLevels: 1
@@ -53,8 +53,8 @@ SuperPoint.modelPath: "/home/yuan/ORB_SLAM3/Models/superpoint_v1.onnx"
 
 # Descriptor distance thresholds (L2 distance for L2-normalized vectors)
 # Range: [0, sqrt(2)] where 0=identical, sqrt(2)=orthogonal
-SuperPoint.thLow: 0.7
-SuperPoint.thHigh: 1.0
+SuperPoint.thLow: 1.0
+SuperPoint.thHigh: 1.4
 
 #--------------------------------------------------------------------------------------------
 # ORB Parameters (used only when Feature.type == "ORB")

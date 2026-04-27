@@ -114,13 +114,10 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     {
         mbUseSuperPoint = true;
         // Set matching thresholds for SuperPoint (L2 distance)
-        ORBmatcher::TH_LOW = fsSettings["SuperPoint.thLow"].empty() ? 0.7f : (float)fsSettings["SuperPoint.thLow"];
-        ORBmatcher::TH_HIGH = fsSettings["SuperPoint.thHigh"].empty() ? 1.0f : (float)fsSettings["SuperPoint.thHigh"];
+        ORBmatcher::TH_LOW = fsSettings["SuperPoint.thLow"].empty() ? 0.5f : (float)fsSettings["SuperPoint.thLow"];
+        ORBmatcher::TH_HIGH = fsSettings["SuperPoint.thHigh"].empty() ? 0.7f : (float)fsSettings["SuperPoint.thHigh"];
         cout << "[System] Using SuperPoint feature extractor" << endl;
         cout << "[System] TH_LOW=" << ORBmatcher::TH_LOW << " TH_HIGH=" << ORBmatcher::TH_HIGH << endl;
-        // Disable loop closing for initial SuperPoint validation
-        activeLC = false;
-        cout << "[System] Loop closing disabled for SuperPoint mode" << endl;
     }
 
     mStrVocabularyFilePath = strVocFile;
@@ -166,8 +163,10 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
         //Create KeyFrame Database
         if(mpVocabulary)
             mpKeyFrameDatabase = new KeyFrameDatabase(*mpVocabulary);
+        else if(mpSPVocabulary)
+            mpKeyFrameDatabase = new KeyFrameDatabase(*mpSPVocabulary);
         else
-            mpKeyFrameDatabase = new KeyFrameDatabase();  // SP mode: empty KFD
+            mpKeyFrameDatabase = new KeyFrameDatabase();
 
         //Create the Atlas
         cout << "Initialization of Atlas from scratch " << endl;
@@ -233,6 +232,10 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     mpTracker = new Tracking(this, mpVocabulary, mpFrameDrawer, mpMapDrawer,
                              mpAtlas, mpKeyFrameDatabase, strSettingsFile, mSensor, settings_, strSequence);
 
+    // Pass SuperPoint vocabulary to tracker for BoW computation
+    if(mbUseSuperPoint && mpSPVocabulary)
+        mpTracker->SetSuperPointVocabulary(mpSPVocabulary);
+
     //Initialize the Local Mapping thread and launch
     mpLocalMapper = new LocalMapping(this, mpAtlas, mSensor==MONOCULAR || mSensor==IMU_MONOCULAR,
                                      mSensor==IMU_MONOCULAR || mSensor==IMU_STEREO || mSensor==IMU_RGBD, strSequence);
@@ -254,7 +257,7 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     // mSensor!=MONOCULAR && mSensor!=IMU_MONOCULAR
     if(activeLC)
     {
-        mpLoopCloser = new LoopClosing(mpAtlas, mpKeyFrameDatabase, mpVocabulary, mSensor!=MONOCULAR, activeLC); // mSensor!=MONOCULAR);
+        mpLoopCloser = new LoopClosing(mpAtlas, mpKeyFrameDatabase, mpVocabulary, mSensor!=MONOCULAR, activeLC, mpSPVocabulary); // mSensor!=MONOCULAR);
         mptLoopClosing = new thread(&ORB_SLAM3::LoopClosing::Run, mpLoopCloser);
 
         //Set pointers between threads

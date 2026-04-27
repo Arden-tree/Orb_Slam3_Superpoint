@@ -55,7 +55,7 @@ KeyFrame::KeyFrame(Frame &F, Map *pMap, KeyFrameDatabase *pKFDB):
     mvInvLevelSigma2(F.mvInvLevelSigma2), mnMinX(F.mnMinX), mnMinY(F.mnMinY), mnMaxX(F.mnMaxX),
     mnMaxY(F.mnMaxY), mK_(F.mK_), mPrevKF(NULL), mNextKF(NULL), mpImuPreintegrated(F.mpImuPreintegrated),
     mImuCalib(F.mImuCalib), mvpMapPoints(F.mvpMapPoints), mpKeyFrameDB(pKFDB),
-    mpORBvocabulary(F.mpORBvocabulary), mbFirstConnection(true), mpParent(NULL), mDistCoef(F.mDistCoef), mbNotErase(false), mnDataset(F.mnDataset),
+    mpORBvocabulary(F.mpORBvocabulary), mpSPVocabulary(F.mpSPVocabulary), mbUseSuperPoint(F.mbUseSuperPoint), mbFirstConnection(true), mpParent(NULL), mDistCoef(F.mDistCoef), mbNotErase(false), mnDataset(F.mnDataset),
     mbToBeErased(false), mbBad(false), mHalfBaseline(F.mb/2), mpMap(pMap), mbCurrentPlaceRecognition(false), mNameFile(F.mNameFile), mnMergeCorrectedForKF(0),
     mpCamera(F.mpCamera), mpCamera2(F.mpCamera2),
     mvLeftToRightMatch(F.mvLeftToRightMatch),mvRightToLeftMatch(F.mvRightToLeftMatch), mTlr(F.GetRelativePoseTlr()),
@@ -99,13 +99,11 @@ void KeyFrame::ComputeBoW()
 {
     if(mBowVec.empty() || mFeatVec.empty())
     {
-        // SuperPoint mode: mpORBvocabulary is nullptr, skip BoW
-        if(!mpORBvocabulary)
-            return;
         vector<cv::Mat> vCurrentDesc = Converter::toDescriptorVector(mDescriptors);
-        // Feature vector associate features with nodes in the 4th level (from leaves up)
-        // We assume the vocabulary tree has 6 levels, change the 4 otherwise
-        mpORBvocabulary->transform(vCurrentDesc,mBowVec,mFeatVec,4);
+        if(mbUseSuperPoint && mpSPVocabulary)
+            mpSPVocabulary->transform(vCurrentDesc, mBowVec, mFeatVec, 4);
+        else if(mpORBvocabulary)
+            mpORBvocabulary->transform(vCurrentDesc, mBowVec, mFeatVec, 4);
     }
 }
 
@@ -1152,6 +1150,12 @@ Eigen::Vector3f KeyFrame::GetRightTranslation() {
 void KeyFrame::SetORBVocabulary(ORBVocabulary* pORBVoc)
 {
     mpORBvocabulary = pORBVoc;
+}
+
+void KeyFrame::SetSuperPointVocabulary(SuperPointVocabulary* pSPVoc)
+{
+    mpSPVocabulary = pSPVoc;
+    mbUseSuperPoint = true;
 }
 
 void KeyFrame::SetKeyFrameDatabase(KeyFrameDatabase* pKFDB)

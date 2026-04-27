@@ -24,6 +24,7 @@
 #include "LocalMapping.h"
 #include "Atlas.h"
 #include "ORBVocabulary.h"
+#include "SuperPointVocabulary.h"
 #include "Tracking.h"
 
 #include "KeyFrameDatabase.h"
@@ -52,7 +53,7 @@ public:
 
 public:
 
-    LoopClosing(Atlas* pAtlas, KeyFrameDatabase* pDB, ORBVocabulary* pVoc,const bool bFixScale, const bool bActiveLC);
+    LoopClosing(Atlas* pAtlas, KeyFrameDatabase* pDB, ORBVocabulary* pVoc, const bool bFixScale, const bool bActiveLC, SuperPointVocabulary* pSPVoc = nullptr);
 
     void SetTracker(Tracking* pTracker);
 
@@ -161,6 +162,7 @@ protected:
 
     KeyFrameDatabase* mpKeyFrameDB;
     ORBVocabulary* mpORBVocabulary;
+    SuperPointVocabulary* mpSPVocabulary;
 
     LocalMapping *mpLocalMapper;
 

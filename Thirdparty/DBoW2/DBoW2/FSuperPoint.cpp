@@ -64,13 +64,24 @@ void FSuperPoint::meanValue(const std::vector<pDescriptor> &descriptors,
 float FSuperPoint::distance(const TDescriptor &a, const TDescriptor &b)
 {
   // For L2-normalized vectors: L2^2 = 2 - 2*dot(a,b)
-  // We return sqrt(L2^2) = actual L2 distance
+  // Raw pointer loop avoids cv::Mat::dot() overhead:
+  //   - no type inference / size check / boundary assertion
+  //   - no temporary matrix allocation
+  //   - tight loop, compiler-friendly for auto-vectorization (NEON on ARM)
   if(a.empty() || b.empty() || a.size() != b.size())
     return 1.414f;  // max L2 distance for normalized vectors
-  float dot = a.dot(b);
+
+  const float *pa = a.ptr<float>(0);
+  const float *pb = b.ptr<float>(0);
+  float dot = 0;
+  for(int i = 0; i < L; i++)
+  {
+    dot += pa[i] * pb[i];
+  }
+
   float dist = 2.0f - 2.0f * dot;
   if(dist < 0) dist = 0;  // numerical stability
-  return sqrt(dist);
+  return sqrtf(dist);
 }
 
 string FSuperPoint::toString(const TDescriptor &a)

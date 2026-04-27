@@ -25,6 +25,7 @@
 #include "Thirdparty/DBoW2/DBoW2/BowVector.h"
 #include "Thirdparty/DBoW2/DBoW2/FeatureVector.h"
 #include "ORBVocabulary.h"
+#include "SuperPointVocabulary.h"
 #include "ORBextractor.h"
 #include "Frame.h"
 #include "KeyFrameDatabase.h"
@@ -302,6 +303,7 @@ public:
 
 
     void SetORBVocabulary(ORBVocabulary* pORBVoc);
+    void SetSuperPointVocabulary(SuperPointVocabulary* pSPVoc);
     void SetKeyFrameDatabase(KeyFrameDatabase* pKFDB);
 
     bool bImu;
@@ -454,6 +456,8 @@ protected:
     // BoW
     KeyFrameDatabase* mpKeyFrameDB;
     ORBVocabulary* mpORBvocabulary;
+    SuperPointVocabulary* mpSPVocabulary = nullptr;
+    bool mbUseSuperPoint = false;
 
     // Grid over the image to speed up feature matching
     std::vector< std::vector <std::vector<size_t> > > mGrid;

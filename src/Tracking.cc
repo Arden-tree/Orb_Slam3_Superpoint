@@ -1563,7 +1563,7 @@ Sophus::SE3f Tracking::GrabImageStereo(const cv::Mat &imRectLeft, const cv::Mat 
         mCurrentFrame.mbUseSuperPoint = true;
         mCurrentFrame.mpSPextractorLeft = mpSPextractorLeft;
         mCurrentFrame.mpSPextractorRight = mpSPextractorRight;
-        mCurrentFrame.mpSPVocabulary = nullptr;  // No SP vocabulary for initial validation
+        mCurrentFrame.mpSPVocabulary = mpSPVocabulary;
     }
 
 #ifdef REGISTER_TIMES
@@ -1621,7 +1621,7 @@ Sophus::SE3f Tracking::GrabImageRGBD(const cv::Mat &imRGB,const cv::Mat &imD, co
         mCurrentFrame.mbUseSuperPoint = true;
         mCurrentFrame.mpSPextractorLeft = mpSPextractorLeft;
         mCurrentFrame.mpSPextractorRight = mpSPextractorRight;
-        mCurrentFrame.mpSPVocabulary = nullptr;
+        mCurrentFrame.mpSPVocabulary = mpSPVocabulary;
     }
 
 #ifdef REGISTER_TIMES
@@ -1657,9 +1657,9 @@ Sophus::SE3f Tracking::GrabImageMonocular(const cv::Mat &im, const double &times
         if(mbUseSuperPoint)
         {
             if(mState==NOT_INITIALIZED || mState==NO_IMAGES_YET ||(lastID - initID) < mMaxFrames)
-                mCurrentFrame = Frame(mImGray,timestamp,mpIniSPextractor,static_cast<SuperPointVocabulary*>(nullptr),mpCamera,mDistCoef,mbf,mThDepth);
+                mCurrentFrame = Frame(mImGray,timestamp,mpIniSPextractor,mpSPVocabulary,mpCamera,mDistCoef,mbf,mThDepth);
             else
-                mCurrentFrame = Frame(mImGray,timestamp,mpSPextractorLeft,static_cast<SuperPointVocabulary*>(nullptr),mpCamera,mDistCoef,mbf,mThDepth);
+                mCurrentFrame = Frame(mImGray,timestamp,mpSPextractorLeft,mpSPVocabulary,mpCamera,mDistCoef,mbf,mThDepth);
         }
         else
         {
@@ -2819,7 +2819,7 @@ bool Tracking::TrackReferenceKeyFrame()
 
     // We perform first an ORB matching with the reference keyframe
     // If enough matches are found we setup a PnP solver
-    ORBmatcher matcher(0.7,true);
+    ORBmatcher matcher(mbUseSuperPoint ? 0.9f : 0.7f,true);
     vector<MapPoint*> vpMapPointMatches;
 
     int nmatches = matcher.SearchByBoW(mpReferenceKF,mCurrentFrame,vpMapPointMatches);
@@ -2948,7 +2948,7 @@ void Tracking::UpdateLastFrame()
 
 bool Tracking::TrackWithMotionModel()
 {
-    ORBmatcher matcher(0.9,true);
+    ORBmatcher matcher(mbUseSuperPoint ? 0.9f : 0.9f,true);
 
     // Update last frame pose according to its reference keyframe
     // Create "visual odometry" points if in Localization Mode
@@ -3149,7 +3149,7 @@ bool Tracking::TrackLocalMap()
     }
     else
     {
-        if(mnMatchesInliers<30)
+        if(mnMatchesInliers < (mbUseSuperPoint ? 20 : 30))
             return false;
         else
             return true;
@@ -3482,7 +3482,7 @@ void Tracking::SearchLocalPoints()
 
     if(nToMatch>0)
     {
-        ORBmatcher matcher(0.8);
+        ORBmatcher matcher(mbUseSuperPoint ? 0.85f : 0.8f);
         int th = 1;
         if(mSensor==System::RGBD || mSensor==System::IMU_RGBD)
             th=3;
@@ -3720,7 +3720,7 @@ bool Tracking::Relocalization()
 
     // We perform first an ORB matching with each candidate
     // If enough matches are found we setup a PnP solver
-    ORBmatcher matcher(0.75,true);
+    ORBmatcher matcher(mbUseSuperPoint ? 0.8f : 0.75f,true);
 
     vector<MLPnPsolver*> vpMLPnPsolvers;
     vpMLPnPsolvers.resize(nKFs);
@@ -3759,7 +3759,7 @@ bool Tracking::Relocalization()
     // Alternatively perform some iterations of P4P RANSAC
     // Until we found a camera pose supported by enough inliers
     bool bMatch = false;
-    ORBmatcher matcher2(0.9,true);
+    ORBmatcher matcher2(mbUseSuperPoint ? 0.85f : 0.9f,true);
 
     while(nCandidates>0 && !bMatch)
     {

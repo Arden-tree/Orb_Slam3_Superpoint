@@ -30,7 +30,13 @@ namespace ORB_SLAM3
 {
 
 KeyFrameDatabase::KeyFrameDatabase (const ORBVocabulary &voc):
-    mpVoc(&voc)
+    mpVoc(&voc), mbUseSuperPoint(false)
+{
+    mvInvertedFile.resize(voc.size());
+}
+
+KeyFrameDatabase::KeyFrameDatabase (const SuperPointVocabulary &voc):
+    mpSPVoc(&voc), mbUseSuperPoint(true)
 {
     mvInvertedFile.resize(voc.size());
 }
@@ -68,7 +74,8 @@ void KeyFrameDatabase::erase(KeyFrame* pKF)
 void KeyFrameDatabase::clear()
 {
     mvInvertedFile.clear();
-    mvInvertedFile.resize(mpVoc->size());
+    unsigned int vocSize = mbUseSuperPoint ? mpSPVoc->size() : mpVoc->size();
+    mvInvertedFile.resize(vocSize);
 }
 
 void KeyFrameDatabase::clearMap(Map* pMap)
@@ -159,7 +166,7 @@ vector<KeyFrame*> KeyFrameDatabase::DetectLoopCandidates(KeyFrame* pKF, float mi
         {
             nscores++;
 
-            float si = mpVoc->score(pKF->mBowVec,pKFi->mBowVec);
+            float si = (mbUseSuperPoint ? mpSPVoc->score(pKF->mBowVec,pKFi->mBowVec) : mpVoc->score(pKF->mBowVec,pKFi->mBowVec));
 
             pKFi->mLoopScore = si;
             if(si>=minScore)
@@ -300,7 +307,7 @@ void KeyFrameDatabase::DetectCandidates(KeyFrame* pKF, float minScore,vector<Key
             {
                 nscores++;
 
-                float si = mpVoc->score(pKF->mBowVec,pKFi->mBowVec);
+                float si = (mbUseSuperPoint ? mpSPVoc->score(pKF->mBowVec,pKFi->mBowVec) : mpVoc->score(pKF->mBowVec,pKFi->mBowVec));
 
                 pKFi->mLoopScore = si;
                 if(si>=minScore)
@@ -388,7 +395,7 @@ void KeyFrameDatabase::DetectCandidates(KeyFrame* pKF, float minScore,vector<Key
             {
                 nscores++;
 
-                float si = mpVoc->score(pKF->mBowVec,pKFi->mBowVec);
+                float si = (mbUseSuperPoint ? mpSPVoc->score(pKF->mBowVec,pKFi->mBowVec) : mpVoc->score(pKF->mBowVec,pKFi->mBowVec));
 
                 pKFi->mMergeScore = si;
                 if(si>=minScore)
@@ -528,7 +535,7 @@ void KeyFrameDatabase::DetectBestCandidates(KeyFrame *pKF, vector<KeyFrame*> &vp
         if(pKFi->mnPlaceRecognitionWords>minCommonWords)
         {
             nscores++;
-            float si = mpVoc->score(pKF->mBowVec,pKFi->mBowVec);
+            float si = (mbUseSuperPoint ? mpSPVoc->score(pKF->mBowVec,pKFi->mBowVec) : mpVoc->score(pKF->mBowVec,pKFi->mBowVec));
             pKFi->mPlaceRecognitionScore=si;
             lScoreAndMatch.push_back(make_pair(si,pKFi));
         }
@@ -659,7 +666,7 @@ void KeyFrameDatabase::DetectNBestCandidates(KeyFrame *pKF, vector<KeyFrame*> &v
         if(pKFi->mnPlaceRecognitionWords>minCommonWords)
         {
             nscores++;
-            float si = mpVoc->score(pKF->mBowVec,pKFi->mBowVec);
+            float si = (mbUseSuperPoint ? mpSPVoc->score(pKF->mBowVec,pKFi->mBowVec) : mpVoc->score(pKF->mBowVec,pKFi->mBowVec));
             pKFi->mPlaceRecognitionScore=si;
             lScoreAndMatch.push_back(make_pair(si,pKFi));
         }
@@ -780,7 +787,7 @@ vector<KeyFrame*> KeyFrameDatabase::DetectRelocalizationCandidates(Frame *F, Map
         if(pKFi->mnRelocWords>minCommonWords)
         {
             nscores++;
-            float si = mpVoc->score(F->mBowVec,pKFi->mBowVec);
+            float si = (mbUseSuperPoint ? mpSPVoc->score(F->mBowVec,pKFi->mBowVec) : mpVoc->score(F->mBowVec,pKFi->mBowVec));
             pKFi->mRelocScore=si;
             lScoreAndMatch.push_back(make_pair(si,pKFi));
         }
@@ -850,8 +857,20 @@ void KeyFrameDatabase::SetORBVocabulary(ORBVocabulary* pORBVoc)
     ptr = (ORBVocabulary**)( &mpVoc );
     *ptr = pORBVoc;
 
+    mbUseSuperPoint = false;
     mvInvertedFile.clear();
     mvInvertedFile.resize(mpVoc->size());
+}
+
+void KeyFrameDatabase::SetSuperPointVocabulary(SuperPointVocabulary* pSPVoc)
+{
+    const SuperPointVocabulary** ptr;
+    ptr = (const SuperPointVocabulary**)( &mpSPVoc );
+    *ptr = pSPVoc;
+
+    mbUseSuperPoint = true;
+    mvInvertedFile.clear();
+    mvInvertedFile.resize(mpSPVoc->size());
 }
 
 } //namespace ORB_SLAM
